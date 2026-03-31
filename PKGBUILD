@@ -1,16 +1,26 @@
 # Maintainer: Jaeho Cho <jaehho@github>
-pkgname=hypr-desktop
-pkgver=1.0.0
+pkgname=hypr-desktop-git
+_pkgname=hypr-desktop
+pkgver=r1.f888bf7
 pkgrel=1
 pkgdesc='Virtual desktop manager and TUI for Hyprland'
 arch=('any')
 url='https://github.com/jaehho/hypr-desktop'
 license=('MIT')
 depends=('hyprland' 'python' 'jq' 'socat')
-source=("$pkgname-$pkgver.tar.gz::$url/archive/v$pkgver.tar.gz")
+makedepends=('git')
+provides=("$_pkgname")
+conflicts=("$_pkgname")
+source=("git+$url.git")
 sha256sums=('SKIP')
 
+pkgver() {
+    cd "$_pkgname"
+    printf "r%s.%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+}
+
 package() {
-    cd "$srcdir/$pkgname-$pkgver"
+    cd "$_pkgname"
     make DESTDIR="$pkgdir" PREFIX=/usr install
+    install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
 }
