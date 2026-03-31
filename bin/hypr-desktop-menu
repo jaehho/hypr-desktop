@@ -13,7 +13,7 @@ DESKTOP_FILE = os.path.expanduser(
 )
 RUNTIME_DIR = f"/tmp/hypr-desktops-{os.getuid()}"
 CURRENT_FILE = f"{RUNTIME_DIR}/current"
-DESKTOP_CMD = os.path.expanduser("~/.local/bin/hypr-desktop")
+DESKTOP_CMD = "hypr-desktop"
 WS_PER_DESKTOP = 10
 
 # ── color pairs ──────────────────────────────────────────────────────
@@ -185,7 +185,7 @@ def draw_menu(stdscr, desktops, current, selected):
     sep_y = by + 1 + min(n, box_h - 4)
     draw_sep(stdscr, sep_y, bx, box_w)
     draw_hints(stdscr, sep_y + 1, bx, box_w, [
-        ("\u23ce", "switch"), ("n", "new"), ("r", "rename"),
+        ("\u23ce", "switch"), ("s", "send"), ("S", "send+go"),
         ("?", "help"),
     ])
 
@@ -261,14 +261,25 @@ def main(stdscr):
 
         elif ch == ord("?"):
             show_help(stdscr, [
+                ("", "── TUI ──"),
                 ("j / \u2193", "Move down"),
                 ("k / \u2191", "Move up"),
                 ("enter", "Switch to desktop"),
+                ("s", "Send focused window to desktop"),
+                ("S", "Send focused window + follow"),
                 ("n", "Create new desktop"),
                 ("r", "Rename selected desktop"),
                 ("d", "Delete selected desktop"),
                 ("c", "Compact (remove empty)"),
                 ("esc / q", "Quit"),
+                ("", "── Global ──"),
+                ("Super+Alt+\u2190/\u2192", "Prev/next desktop"),
+                ("Super+Alt+Shift+\u2190/\u2192", "Send window to prev/next"),
+                ("Super+1-0", "Switch workspace"),
+                ("Super+Shift+1-0", "Move window to workspace"),
+                ("Super+Tab", "Cycle workspaces on monitor"),
+                ("Super+X", "Rename current desktop"),
+                ("Super+Shift+D", "Delete current desktop"),
             ])
 
         elif ch in (ord("j"), curses.KEY_DOWN):
@@ -280,6 +291,19 @@ def main(stdscr):
         elif ch in (10, curses.KEY_ENTER):
             desk = desktops[selected]
             if desk["id"] != current:
+                desktop_cmd("switch", str(desk["id"]))
+            break
+
+        elif ch == ord("s"):
+            desk = desktops[selected]
+            if desk["id"] != current:
+                desktop_cmd("sendtodesktop", str(desk["id"]))
+                desktops, current = get_state()
+
+        elif ch == ord("S"):
+            desk = desktops[selected]
+            if desk["id"] != current:
+                desktop_cmd("sendtodesktop", str(desk["id"]))
                 desktop_cmd("switch", str(desk["id"]))
             break
 
