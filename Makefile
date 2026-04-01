@@ -3,7 +3,7 @@ PREFIX ?= $(HOME)/.local
 AUR_PKG  := hypr-desktop-git
 AUR_REPO := ssh://aur@aur.archlinux.org/$(AUR_PKG).git
 
-include hypr-tui/release.mk
+-include hypr-tui/release.mk
 
 install:
 	install -Dm755 bin/hypr-desktop $(DESTDIR)$(PREFIX)/bin/hypr-desktop
