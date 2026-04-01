@@ -1,45 +1,19 @@
 PREFIX ?= $(HOME)/.local
 
-CURRENT_TAG := $(shell git describe --tags --abbrev=0 2>/dev/null || echo v0.0.0)
-CURRENT_VER := $(CURRENT_TAG:v%=%)
-MAJOR := $(word 1,$(subst ., ,$(CURRENT_VER)))
-MINOR := $(word 2,$(subst ., ,$(CURRENT_VER)))
-PATCH := $(word 3,$(subst ., ,$(CURRENT_VER)))
-
 AUR_PKG  := hypr-desktop-git
 AUR_REPO := ssh://aur@aur.archlinux.org/$(AUR_PKG).git
+
+include hypr-tui/release.mk
 
 install:
 	install -Dm755 bin/hypr-desktop $(DESTDIR)$(PREFIX)/bin/hypr-desktop
 	install -Dm755 bin/hypr-desktop-menu $(DESTDIR)$(PREFIX)/bin/hypr-desktop-menu
+	install -dm755 $(DESTDIR)$(PREFIX)/lib/hypr-desktop/hypr_tui
+	install -m644 hypr-tui/hypr_tui/__init__.py $(DESTDIR)$(PREFIX)/lib/hypr-desktop/hypr_tui/__init__.py
 
 uninstall:
 	rm -f $(DESTDIR)$(PREFIX)/bin/hypr-desktop
 	rm -f $(DESTDIR)$(PREFIX)/bin/hypr-desktop-menu
+	rm -rf $(DESTDIR)$(PREFIX)/lib/hypr-desktop
 
-release-major: V=$(shell echo $$(($(MAJOR)+1))).0.0
-release-major: _release ## Bump major version (1.2.3 → 2.0.0)
-
-release-minor: V=$(MAJOR).$(shell echo $$(($(MINOR)+1))).0
-release-minor: _release ## Bump minor version (1.2.3 → 1.3.0)
-
-release-patch: V=$(MAJOR).$(MINOR).$(shell echo $$(($(PATCH)+1)))
-release-patch: _release ## Bump patch version (1.2.3 → 1.2.4)
-
-_release:
-	@test -z "$$(git status --porcelain)" || { echo "Error: working tree not clean — commit first"; exit 1; }
-	@echo "==> $(CURRENT_VER) → $(V)"
-	git tag v$(V)
-	git push && git push --tags
-	@echo "==> Updating AUR..."
-	$(eval _TMP := $(shell mktemp -d))
-	git clone $(AUR_REPO) $(_TMP)
-	cp PKGBUILD $(_TMP)/PKGBUILD
-	cd $(_TMP) && makepkg --printsrcinfo > .SRCINFO && \
-		git add PKGBUILD .SRCINFO && \
-		git commit -m "Update to $(V)" && \
-		git push origin HEAD:master
-	rm -rf $(_TMP)
-	@echo "==> Released v$(V)"
-
-.PHONY: install uninstall release-major release-minor release-patch _release
+.PHONY: install uninstall

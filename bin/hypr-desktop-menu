@@ -7,6 +7,19 @@ import os
 import subprocess
 import sys
 
+# Resolve hypr_tui: installed lib or dev submodule
+_here = os.path.dirname(os.path.realpath(__file__))
+for _p in [os.path.join(_here, "..", "lib", "hypr-desktop"),
+           os.path.join(_here, "..", "hypr-tui")]:
+    if os.path.isdir(os.path.join(_p, "hypr_tui")):
+        sys.path.insert(0, _p)
+        break
+
+from hypr_tui import (
+    C_ACCENT, C_BRIGHT, C_DIM, C_HEADER, C_KEY, C_NORMAL, C_SELECTED,
+    draw_box, draw_hints, draw_sep, init_colors, show_help,
+)
+
 DESKTOP_FILE = os.path.expanduser(
     os.environ.get("XDG_STATE_HOME", os.path.expanduser("~/.local/state"))
     + "/hypr-desktops/desktops"
@@ -15,16 +28,6 @@ RUNTIME_DIR = f"/tmp/hypr-desktops-{os.getuid()}"
 CURRENT_FILE = f"{RUNTIME_DIR}/current"
 DESKTOP_CMD = "hypr-desktop"
 WS_PER_DESKTOP = 10
-
-# ── color pairs ──────────────────────────────────────────────────────
-
-C_NORMAL = 1
-C_SELECTED = 2
-C_CURRENT = 3
-C_HEADER = 4
-C_KEY = 5
-C_DIM = 6
-C_INPUT = 7
 
 # ── data ─────────────────────────────────────────────────────────────
 
@@ -74,32 +77,6 @@ def get_state():
 
 # ── drawing ──────────────────────────────────────────────────────────
 
-BOX_PAD = 2  # horizontal padding inside box
-
-
-def draw_box(win, y, x, h, w, title=""):
-    """Draw a unicode box with optional title."""
-    attr = curses.color_pair(C_DIM)
-    win.addstr(y, x, "┌", attr)
-    if title:
-        win.addstr("─ ", attr)
-        win.addstr(title, curses.color_pair(C_HEADER) | curses.A_BOLD)
-        win.addstr(" " + "─" * max(0, w - len(title) - 5), attr)
-    else:
-        win.addstr("─" * (w - 2), attr)
-    win.addstr("┐", attr)
-
-    for row in range(1, h - 1):
-        win.addstr(y + row, x, "│", attr)
-        win.addstr(y + row, x + w - 1, "│", attr)
-
-    win.addstr(y + h - 1, x, "└" + "─" * (w - 2) + "┘", attr)
-
-
-def draw_sep(win, y, x, w):
-    attr = curses.color_pair(C_DIM)
-    win.addstr(y, x, "├" + "─" * (w - 2) + "┤", attr)
-
 
 def draw_row(win, y, x, w, desk, is_current, is_selected):
     marker = "▸" if is_current else " "
@@ -110,7 +87,7 @@ def draw_row(win, y, x, w, desk, is_current, is_selected):
     if is_selected:
         attr = curses.color_pair(C_SELECTED) | curses.A_BOLD
     elif is_current:
-        attr = curses.color_pair(C_CURRENT)
+        attr = curses.color_pair(C_ACCENT)
     else:
         attr = curses.color_pair(C_NORMAL)
 
@@ -119,47 +96,6 @@ def draw_row(win, y, x, w, desk, is_current, is_selected):
     text = text[:inner].ljust(inner)
 
     win.addstr(y, x + 1, text, attr)
-
-
-def draw_hints(win, y, x, w, hints):
-    """hints: list of (key, label) tuples."""
-    inner = w - 2
-    win.addstr(y, x + 1, " " * inner, curses.color_pair(C_NORMAL))
-    cx = x + 2
-    for key, label in hints:
-        if cx + len(key) + len(label) + 3 > x + w - 1:
-            break
-        win.addstr(y, cx, key, curses.color_pair(C_KEY) | curses.A_BOLD)
-        win.addstr(f" {label}", curses.color_pair(C_DIM))
-        cx += len(key) + len(label) + 3
-
-
-def show_help(stdscr, binds):
-    """Show a keybind help overlay. Press any key to dismiss."""
-    rows, cols = stdscr.getmaxyx()
-    max_key = max(len(k) for k, _ in binds)
-    box_w = min(max_key + max(len(d) for _, d in binds) + 8, cols - 4)
-    box_h = min(len(binds) + 3, rows - 2)
-    bx = (cols - box_w) // 2
-    by = (rows - box_h) // 2
-
-    stdscr.erase()
-    draw_box(stdscr, by, bx, box_h, box_w, "Keybinds")
-    for i, (key, desc) in enumerate(binds):
-        if by + 1 + i >= by + box_h - 2:
-            break
-        try:
-            stdscr.addstr(by + 1 + i, bx + 2,
-                          key.rjust(max_key),
-                          curses.color_pair(C_KEY) | curses.A_BOLD)
-            stdscr.addstr(f"  {desc}", curses.color_pair(C_NORMAL))
-        except curses.error:
-            pass
-    draw_sep(stdscr, by + box_h - 2, bx, box_w)
-    draw_hints(stdscr, by + box_h - 1, bx, box_w, [("any key", "close")])
-    # bottom border got overwritten by hints row; just leave it
-    stdscr.refresh()
-    stdscr.getch()
 
 
 def draw_menu(stdscr, desktops, current, selected):
@@ -209,7 +145,7 @@ def text_input(stdscr, bx, by, box_w, box_h, prompt, initial=""):
         stdscr.addstr(sep_y + 1, bx + 2, prompt, curses.color_pair(C_KEY) | curses.A_BOLD)
         px = bx + 2 + len(prompt)
         maxlen = bx + box_w - 2 - px
-        stdscr.addstr(sep_y + 1, px, text[:maxlen], curses.color_pair(C_INPUT))
+        stdscr.addstr(sep_y + 1, px, text[:maxlen], curses.color_pair(C_BRIGHT))
 
         # Cancel hint
         stdscr.addstr(sep_y + 2, bx + 1, " " * inner, curses.color_pair(C_NORMAL))
@@ -238,15 +174,7 @@ def text_input(stdscr, bx, by, box_w, box_h, prompt, initial=""):
 
 
 def main(stdscr):
-    curses.curs_set(0)
-    curses.use_default_colors()
-    curses.init_pair(C_NORMAL, -1, -1)
-    curses.init_pair(C_SELECTED, curses.COLOR_BLACK, curses.COLOR_CYAN)
-    curses.init_pair(C_CURRENT, curses.COLOR_CYAN, -1)
-    curses.init_pair(C_HEADER, curses.COLOR_CYAN, -1)
-    curses.init_pair(C_KEY, curses.COLOR_YELLOW, -1)
-    curses.init_pair(C_DIM, 8, -1)
-    curses.init_pair(C_INPUT, curses.COLOR_WHITE, -1)
+    init_colors()
 
     desktops, current = get_state()
     selected = next((i for i, d in enumerate(desktops) if d["id"] == current), 0)
